@@ -18,6 +18,7 @@ struct ExecutorVariableFrame_T {
 
 struct ExecutorPerformanceReport_T {
   int lines_executed;
+  int total_lines;
   int did_return;
   int uninitialized_vars_referenced;
 };

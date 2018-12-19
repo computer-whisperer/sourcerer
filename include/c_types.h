@@ -8,7 +8,8 @@
 
 enum BasicDataType_T {
   BASICTYPE_INT, 
-  BASICTYPE_CHAR
+  BASICTYPE_CHAR,
+  BASICTYPE_COUNT,
 };
 
 struct DataType_T {
@@ -45,7 +46,7 @@ enum Condition_T{
   CONDITION_GREATER_THAN_OR_EQUAL,
   CONDITION_LESS_THAN,
   CONDITION_LESS_THAN_OR_EQUAL,
-  CONDITION_TYPE_COUNT,
+  CONDITION_COUNT,
 };
 
 enum CodeLineType_T{
@@ -104,8 +105,45 @@ struct Function_T {
   struct Function_T * next;
 };
 
-struct Function_T * global_context;
+enum ChangeType_T {
+  CHANGE_TYPE_INSERT_CODELINE,
+  CHANGE_TYPE_REMOVE_CODELINE,
+  CHANGE_TYPE_INSERT_VARIABLE,
+  CHANGE_TYPE_REMOVE_VARIABLE,
+  CHANGE_TYPE_ALTER_CONSTANT,
+  CHANGE_TYPE_ALTER_ARGUMENT,
+  CHANGE_TYPE_ALTER_ASSIGNED_VARIABLE,
+};
+
+struct Change_T {
+  enum ChangeType_T type;
+  
+  struct Function_T * function;
+  
+  struct CodeLine_T * codeline;
+  struct Variable_T * variable;
+  union ConstantValue_T constant;
+  int argument_index;
+  
+  struct CodeLine_T * next_codeline; // Used to position inserts
+  
+  struct Change_T * next;
+};
+
+struct Function_T * get_first_function(struct Function_T * function);
+struct Function_T * get_last_function(struct Function_T * function);
+
+struct Function_T * build_main_four_args();
+
+struct Variable_T * variable_name_search(struct Variable_T * var, char * name);
 
 struct Function_T * build_context();
+
+int is_same_datatype(struct DataType_T a, struct DataType_T b);
+
+int assert_full_structure_integrity(struct Function_T * first_function);
+
+struct Change_T * apply_change(struct Change_T * change);
+void free_change(struct Change_T * change);
 
 #endif  // C_TYPES_H

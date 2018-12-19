@@ -40,6 +40,14 @@ union ExecutorValue_T execute_function(struct Function_T * function, union Execu
   report->lines_executed = 0;
   report->did_return = 0;
   report->uninitialized_vars_referenced = 0;
+  report->total_lines = 0;
+  
+  struct CodeLine_T * codeline = function->first_codeline;
+  while (codeline){
+    report->total_lines++;
+    codeline = codeline->next;
+  }
+    
   
   // Allocate memory for per-variable stack frames
   union ExecutorValue_T sub_args[FUNCTION_ARG_COUNT];
@@ -64,7 +72,7 @@ union ExecutorValue_T execute_function(struct Function_T * function, union Execu
   union ExecutorValue_T rval = (union ExecutorValue_T){.ptr=NULL};
   
   // Execute codelines
-  struct CodeLine_T * codeline = function->first_codeline;
+  codeline = function->first_codeline;
   struct CodeLine_T * next_codeline = NULL;
   int lines_executed = 0;
   int returned = 0;
