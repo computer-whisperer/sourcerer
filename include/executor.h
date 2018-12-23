@@ -5,27 +5,15 @@
 
 #define PUTCHAR_BUFF_LEN 50
 
-union ExecutorValue_T {
-  char c;
-  int i;
-  void * ptr;
-};
-
-struct ExecutorVariableFrame_T {
-  union ExecutorValue_T value;
-  struct ExecutorVariableFrame_T * next;
-};
-
-struct ExecutorPerformanceReport_T {
-  int lines_executed;
-  int total_lines;
-  int did_return;
-  int uninitialized_vars_referenced;
+struct MemoryDMZ_T {
+  void * start;
+  void * end;
+  struct MemoryDMZ_T * next;
 };
 
 int putchar_i;
 char putchar_buff[PUTCHAR_BUFF_LEN];
 
-union ExecutorValue_T execute_function(struct Function_T * function, union ExecutorValue_T * args, struct ExecutorPerformanceReport_T * report, int execution_limit);
+int execute_function(struct Function_T * function, struct MemoryDMZ_T * dmz, void * arguments_data[], size_t arguments_size[], void * return_data, size_t return_size, int execution_limit);
 
 #endif // EXECUTOR_H

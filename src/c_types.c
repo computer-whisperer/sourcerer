@@ -2,25 +2,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "membox.h"
 #include "c_types.h"
 
-struct Function_T * get_first_function(struct Function_T * function) {
-  if (function)
-    while (function->prev)
-      function = function->prev;
-  return function;
-}
-
-struct Function_T * get_last_function(struct Function_T * function) {
-  if (function)
-    while (function->next)
-      function = function->next;
-  return function;
-}
-
-int is_same_datatype(struct DataType_T a, struct DataType_T b) {
-  return a.basic_type == b.basic_type && a.pointer_level == b.pointer_level;
-}
 
 int get_reference_count(struct Variable_T * var, struct Function_T * function) {
   struct CodeLine_T * codeline = function->first_codeline;
@@ -29,11 +13,21 @@ int get_reference_count(struct Variable_T * var, struct Function_T * function) {
     if (codeline->assigned_variable && codeline->assigned_variable == var)
       count++;
     for (int i = 0; i < FUNCTION_ARG_COUNT; i++) {
-      if (!codeline->function_arguments[i])
+      if (!codeline->args[i])
         break;
-      if (codeline->function_arguments[i] == var)
+      if (codeline->args[i] == var)
         count++;
     }
+    codeline = codeline->next;
+  }
+  return count;
+}
+
+int get_codeline_count(struct Function_T * function) {
+  struct CodeLine_T * codeline = function->first_codeline;
+  int count = 0;
+  while (codeline) {
+    count++;
     codeline = codeline->next;
   }
   return count;
@@ -48,53 +42,153 @@ struct Variable_T * variable_name_search(struct Variable_T * var, char * name) {
   return var;
 }
 
-struct Function_T * build_context() {
-  struct DataType_T dt_i = {BASICTYPE_INT, 0};
-  struct DataType_T dt_c = {BASICTYPE_CHAR, 0};
-  struct Variable_T * int_var = malloc(sizeof(struct Variable_T));
-  struct Variable_T * char_var = malloc(sizeof(struct Variable_T));
-  int_var->data_type = dt_i;
-  char_var->data_type = dt_c;
-  int func_count = 5;
-  struct Function_T * funcs = malloc(sizeof(struct Function_T)*func_count);
-  funcs[0] = (struct Function_T){.type=FUNCTION_TYPE_BASIC_OP, .name="+", .return_datatype=dt_i, .function_arguments={int_var, int_var, NULL}};
-  funcs[1] = (struct Function_T){.type=FUNCTION_TYPE_BASIC_OP, .name="-", .return_datatype=dt_i, .function_arguments={int_var, int_var, NULL}};
-  funcs[2] = (struct Function_T){.type=FUNCTION_TYPE_BASIC_OP, .name="*", .return_datatype=dt_i, .function_arguments={int_var, int_var, NULL}};
-  funcs[3] = (struct Function_T){.type=FUNCTION_TYPE_BASIC_OP, .name="/", .return_datatype=dt_i, .function_arguments={int_var, int_var, NULL}};
-  funcs[4] = (struct Function_T){.type=FUNCTION_TYPE_BUILTIN, .name="putchar", .return_datatype=dt_c, .function_arguments={char_var, NULL}};
-  for (int i = 0; i < func_count; i++) {
-    funcs[i].next = funcs + i + 1;
-    funcs[i].prev = funcs + i - 1;
+struct DataType_T * add_new_datatype(struct Environment_T * environment, struct DataType_T start) {
+  struct DataType_T * base_data_type = malloc(sizeof(struct DataType_T));
+  *base_data_type = start;
+  base_data_type->environment = environment;
+  base_data_type->pointer_degree = 0;
+  base_data_type->pointing_to = NULL;
+  base_data_type->pointed_from = NULL;
+  
+  // Add to linked list
+  base_data_type->prev = environment->last_datatype;
+  base_data_type->next = NULL;
+  if (base_data_type->prev)
+    base_data_type->prev->next = base_data_type;
+  else
+    environment->first_datatype = base_data_type;
+  environment->last_datatype = base_data_type;
+  
+  struct DataType_T * last_type = base_data_type;
+  for (int i = 1; i < MAX_POINTER_DEPTH; i++) {
+    struct DataType_T * pointer_data_type = malloc(sizeof(struct DataType_T));
+    pointer_data_type->type = DATATYPETYPE_POINTER;
+    pointer_data_type->environment = environment;
+    pointer_data_type->pointer_degree = last_type->pointer_degree + 1;
+    pointer_data_type->size = sizeof(void *);
+    
+    // Set name
+    strcpy(pointer_data_type->name, last_type->name);
+    
+    pointer_data_type->name[strlen(last_type->name)] = '*';
+    pointer_data_type->name[strlen(last_type->name)+1] = '\0';
+    
+    // Link to other pointer types
+    pointer_data_type->pointing_to = last_type;
+    pointer_data_type->pointing_to->pointed_from = pointer_data_type;
+    pointer_data_type->pointed_from = NULL;
+    
+    // Add to linked list
+    pointer_data_type->prev = environment->last_datatype;
+    pointer_data_type->next = NULL;
+    if (pointer_data_type->prev)
+      pointer_data_type->prev->next = pointer_data_type;
+    else
+      environment->first_datatype = pointer_data_type;
+    environment->last_datatype = pointer_data_type;
+    
+    last_type = pointer_data_type;
   }
-  funcs[0].prev = NULL;
-  funcs[func_count-1].next = NULL;
-  return funcs;
+  
+  return base_data_type;
 }
 
-struct Function_T * build_main_four_args() {
-  struct Function_T * func = malloc(sizeof(struct Function_T));
-  struct DataType_T dt_i = {BASICTYPE_INT, 0};
-  struct DataType_T dt_c = {BASICTYPE_CHAR, 0};
-  int var_count = 4;
-  struct Variable_T * vars = malloc(sizeof(struct Variable_T)*var_count);
-  vars[0] = (struct Variable_T){.name="a", .is_arg=1, .references=1, .data_type=dt_i};
-  vars[1] = (struct Variable_T){.name="b", .is_arg=1, .references=1, .data_type=dt_i};
-  vars[2] = (struct Variable_T){.name="c", .is_arg=1, .references=1, .data_type=dt_i};
-  vars[3] = (struct Variable_T){.name="d", .is_arg=1, .references=1, .data_type=dt_c};
-  (*func) =  (struct Function_T){.type=FUNCTION_TYPE_CUSTOM, .name="main", .return_datatype={BASICTYPE_INT, 0}, .next=build_context(), .prev=NULL, .first_var=&(vars[0]), .last_var=&(vars[var_count-1]), .function_arguments={&(vars[0]), &(vars[1]), &(vars[2]), &(vars[3]), NULL}};
-  func->next->prev = func;
-  for (int i = 0; i < var_count; i++) {
-    vars[i].parent_function = func;
-    vars[i].next = vars + i + 1;
-    vars[i].prev = vars + i - 1;
+
+struct Function_T * add_new_function(struct Environment_T * environment, char name[], struct DataType_T * return_datatype, struct DataType_T * argument_types[], enum FunctionType_T type) {
+  struct Function_T * function = malloc(sizeof(struct Function_T));
+  function->type = type;
+  function->environment = environment;
+  strcpy(function->name, name);
+  function->return_datatype = return_datatype;
+  
+  function->codeline_count = 0;
+  
+  function->first_codeline = NULL;
+  function->last_codeline = NULL;
+  
+  function->first_variable = NULL;
+  function->last_variable = NULL;
+  
+  // Add to linked list
+  function->next = NULL;
+  function->prev = environment->last_function;
+  environment->last_function = function;
+  if (function->prev)
+    function->prev->next = function;
+  else
+    environment->first_function = function;
+  
+  // Build variables for arguments
+  for (int i = 0; i < FUNCTION_ARG_COUNT; i++) {
+    if (!argument_types[i]) {
+      function->args[i] = NULL;
+      break;
+    }
+    // New variable
+    struct Variable_T * variable = malloc(sizeof(struct Variable_T));
+    variable->name[0] = i + 97;
+    variable->name[1] = '\0';
+    variable->is_arg = 1;
+    variable->function = function;
+    variable->data_type = argument_types[i];
+    variable->references = 1;
+    
+    // Add to arg list
+    function->args[i] = variable;
+    
+    // Add to linked list
+    variable->next = NULL;
+    variable->prev = function->last_variable;
+    function->last_variable = variable;
+    if (variable->prev)
+      variable->prev->next = variable;
+    else
+      function->first_variable = variable;
   }
-  vars[0].prev = NULL;
-  vars[var_count-1].next = NULL;
-  return func;
+  return function;
 }
 
-int is_function_valid(struct Function_T * first_function, struct Function_T * function) {
-  struct Function_T * function_ptr = first_function;
+struct Environment_T * build_new_environment(char name[NAME_LEN], size_t membox_size) {
+  struct Environment_T * environment = malloc(sizeof(struct Environment_T));
+  
+  // Initialize basic datatypes
+  environment->int_datatype = add_new_datatype(environment, (struct DataType_T){.type=DATATYPETYPE_PRIMITIVE, .name="int", .size=sizeof(int)});
+  environment->char_datatype = add_new_datatype(environment, (struct DataType_T){.type=DATATYPETYPE_PRIMITIVE, .name="char", .size=sizeof(char)});
+  
+  // Add available functions
+  struct DataType_T * basic_int_args[] = {environment->int_datatype, environment->int_datatype, NULL};
+  add_new_function(environment, "+", environment->int_datatype, basic_int_args, FUNCTION_TYPE_BASIC_OP);
+  add_new_function(environment, "-", environment->int_datatype, basic_int_args, FUNCTION_TYPE_BASIC_OP);
+  add_new_function(environment, "*", environment->int_datatype, basic_int_args, FUNCTION_TYPE_BASIC_OP);
+  add_new_function(environment, "/", environment->int_datatype, basic_int_args, FUNCTION_TYPE_BASIC_OP);
+  //add_new_function(environment, "%", environment->int_datatype, basic_int_args, FUNCTION_TYPE_BASIC_OP);
+  
+  //struct DataType_T * fancy_int_args[] = {environment->char_datatype, environment->int_datatype, NULL};
+  //add_new_function(environment, "+", environment->char_datatype, fancy_int_args, FUNCTION_TYPE_BASIC_OP);
+  
+  struct DataType_T * putchar_args[] = {environment->char_datatype, NULL};
+  add_new_function(environment, "putchar", environment->char_datatype, putchar_args, FUNCTION_TYPE_BUILTIN);
+  
+  struct DataType_T * main_args[] = {environment->int_datatype, environment->int_datatype, environment->int_datatype, environment->char_datatype, NULL};
+  environment->main = add_new_function(environment, "main", environment->int_datatype, main_args, FUNCTION_TYPE_CUSTOM);
+  
+  // Init memory box
+  environment->membox = build_membox(membox_size);
+  return environment;
+}
+
+int is_datatype_in_environment(struct Environment_T * environment, struct DataType_T * data_type) {
+  struct DataType_T * data_type_ptr = environment->first_datatype;
+  while (data_type_ptr) {
+    if (data_type_ptr == data_type)
+      return 1;
+    data_type_ptr = data_type_ptr->next;
+  }
+  return 0;
+}
+
+int is_function_in_environment(struct Environment_T * environment, struct Function_T * function) {
+  struct Function_T * function_ptr = environment->first_function;
   while (function_ptr) {
     if (function_ptr == function)
       return 1;
@@ -103,8 +197,20 @@ int is_function_valid(struct Function_T * first_function, struct Function_T * fu
   return 0;
 }
 
-int is_variable_valid(struct Function_T * function, struct Variable_T * variable) {
-  struct Variable_T * variable_ptr = function->first_var;
+struct DataType_T * datatype_pointer_jump(struct DataType_T * origin, int reference_count) {
+  if (reference_count == 0)
+    return origin;
+  if (!origin)
+    return origin;
+  
+  if (reference_count > 0)
+    return datatype_pointer_jump(origin->pointing_to, reference_count-1);
+  else
+    return datatype_pointer_jump(origin->pointed_from, reference_count+1);
+}
+
+int is_variable_in_function(struct Function_T * function, struct Variable_T * variable) {
+  struct Variable_T * variable_ptr = function->first_variable;
   while (variable_ptr) {
     if (variable_ptr == variable)
       return 1;
@@ -113,9 +219,67 @@ int is_variable_valid(struct Function_T * function, struct Variable_T * variable
   return 0;
 }
 
+int get_pointer_degree(struct DataType_T * data_type) {
+  int degree = 0;
+  while (data_type && data_type->type == DATATYPETYPE_POINTER) {
+    degree++;
+    data_type = data_type->pointing_to;
+  }
+  return degree;
+}
+
 // Returns 0 for success, -1 for failure
-int assert_full_structure_integrity(struct Function_T * first_function) {
-  struct Function_T * function = first_function;
+int assert_environment_integrity(struct Environment_T * environment) {
+  
+  // Validate datatypes
+  struct DataType_T * data_type = environment->first_datatype;
+  if ((data_type && data_type->prev) || (!data_type && environment->last_datatype)) {
+    printf("Data type list not linked correctly. \n");
+    return -1;
+  }
+  while (data_type) {
+    if (data_type->next && data_type != data_type->next->prev) {
+      printf("Data type list not linked correctly. \n");
+      return -1;
+    }
+    
+    if (data_type->environment != environment) {
+      printf("Data type not linked to environment. \n");
+      return -1;
+    }
+    
+    if (data_type->type == DATATYPETYPE_POINTER) {
+      if (!data_type->pointing_to) {
+        printf("Data type with type pointer does not have a pointing_to value. \n");
+        return -1;
+      }
+      if (data_type->pointer_degree != get_pointer_degree(data_type)) {
+        printf("Data type pointer has incorrect pointer degree.\n");
+        return -1;
+      }
+    }
+    
+    if (data_type->pointing_to && !is_datatype_in_environment(environment, data_type->pointing_to)) {
+      printf("Data type has invalid pointing_to link. \n");
+      return -1;
+    }
+    
+    if (data_type->pointed_from && !is_datatype_in_environment(environment, data_type->pointed_from)) {
+      printf("Data type has invalid pointed_from link. \n");
+      return -1;
+    }
+    
+    if (!data_type->next && data_type != environment->last_datatype) {
+      printf("Data type list not linked correctly. \n");
+      return -1;
+    }
+    
+    data_type = data_type->next;
+      
+  }
+  
+  // Validate functions
+  struct Function_T * function = environment->first_function;
   int i;
   if (function->prev){
     printf("Function list not linked correctly.\n");
@@ -129,18 +293,28 @@ int assert_full_structure_integrity(struct Function_T * first_function) {
       return -1;
     }
     
+    if (function->environment != environment) {
+      printf("Function not linked to environment.\n");
+      return -1;
+    }
+    
+    if (function->codeline_count != get_codeline_count(function)) {
+      printf("Function codeline count is incorrect.\n");
+      return -1;
+    }
+    
     // Otherwise skip checks for builtin functions
     if (function->type == FUNCTION_TYPE_CUSTOM) {
     
       // Assert variable list integrity
-      struct Variable_T * variable = function->first_var;
+      struct Variable_T * variable = function->first_variable;
       if (variable->prev) {
         printf("Variable list not linked correctly.\n");
         return -1;
       }
       while (variable) {
         // Check function link
-        if (variable->parent_function != function) {
+        if (variable->function != function) {
           printf("Variable not linked back to function.\n");
           return -1;
         }
@@ -153,9 +327,9 @@ int assert_full_structure_integrity(struct Function_T * first_function) {
         if (variable->is_arg) {
           int found = 0;
           for (int i = 0; i < FUNCTION_ARG_COUNT; i++) {
-            if (!function->function_arguments[i])
+            if (!function->args[i])
               break;
-            if (function->function_arguments[i] == variable) {
+            if (function->args[i] == variable) {
               found = 1;
               break;
             }
@@ -171,15 +345,15 @@ int assert_full_structure_integrity(struct Function_T * first_function) {
           return -1;
         }
         // Check name uniqueness
-        if (variable_name_search(function->first_var, variable->name) != variable) {
+        if (variable_name_search(function->first_variable, variable->name) != variable) {
           // If a name is repeated in a function, then it will get caught when the name_search is performed on the second one.
           printf("Two variables in the same function have the same name.\n");
           return -1;
         }
         
         // Check last var
-        if (!function->next && variable != function->last_var) {
-          printf("Function last_var is not the last variable in the linked list.\n");
+        if (!variable->next && variable != function->last_variable) {
+          printf("Function last_variable is not the last variable in the linked list.\n");
           return -1;
         }
         
@@ -188,10 +362,10 @@ int assert_full_structure_integrity(struct Function_T * first_function) {
       
       // Verify argument list
       for (i = 0; i < FUNCTION_ARG_COUNT; i++) {
-        variable = function->function_arguments[i];
+        variable = function->args[i];
         if (!variable)
           break;
-        if (!is_variable_valid(function, variable)) {
+        if (!is_variable_in_function(function, variable)) {
           printf("Variable is in function argument list but not listed in the function variables.\n");
           return -1;
         }
@@ -213,7 +387,7 @@ int assert_full_structure_integrity(struct Function_T * first_function) {
             printf("Codeline list not linked correctly.\n");
             return -1;
           }
-          if (codeline->parent_function != function) {
+          if (codeline->function != function) {
             printf("Codeline not linked back to function.\n");
             return -1;
           }
@@ -225,50 +399,54 @@ int assert_full_structure_integrity(struct Function_T * first_function) {
           switch (codeline->type) {
             
             case CODELINE_TYPE_CONSTANT_ASSIGNMENT:
-              if (!is_variable_valid(function, codeline->assigned_variable)) {
+              if (!is_variable_in_function(function, codeline->assigned_variable)) {
                 printf("Codeline references invalid assigned_variable.\n");
+                return -1;
+              }
+              if (codeline->assigned_variable->data_type->type == DATATYPETYPE_POINTER) {
+                printf("Codeline is trying to assign a constant to a pointer.\n");
                 return -1;
               }
               break;
               
             case CODELINE_TYPE_FUNCTION_CALL:
-              if (!is_variable_valid(function, codeline->assigned_variable)) {
+              if (!is_variable_in_function(function, codeline->assigned_variable)) {
                 printf("Codeline references invalid assigned_variable.\n");
                 return -1;
               }
-              if (!is_function_valid(first_function, codeline->target_function)) {
+              if (!is_function_in_environment(environment, codeline->target_function)) {
                 printf("Codeline references invalid target_function.\n");
                 return -1;
               }
               for (int i = 0; i < FUNCTION_ARG_COUNT; i++) {
-                variable = codeline->function_arguments[i];
+                variable = codeline->args[i];
                 if (!variable)
                   break;
-                if (!is_variable_valid(function, variable)) {
+                if (!is_variable_in_function(function, variable)) {
                   printf("Codeline references an invalid variable as function argument.\n");
                   return -1;
                 }
-                if (!codeline->target_function->function_arguments[i]) {
+                if (!codeline->target_function->args[i]) {
                   printf("Codeline has more arguments than target function.\n");
                   return -1;
                 }
-                if (!is_same_datatype(codeline->target_function->function_arguments[i]->data_type, variable->data_type)) {
+                if (codeline->target_function->args[i]->data_type != variable->data_type) {
                   printf("Codeline has argument that does not match the type of the argument in the target_function.\n");
                   return -1;
                 }
               }
-              if (i < FUNCTION_ARG_COUNT && codeline->target_function->function_arguments[i]) {
+              if (i < FUNCTION_ARG_COUNT && codeline->target_function->args[i]) {
                 printf("Codeline has fewer arguments than target function.\n");
                 return -1;
               }
               break;
             
             case CODELINE_TYPE_RETURN:
-              if (!is_variable_valid(function, codeline->assigned_variable)) {
+              if (!is_variable_in_function(function, codeline->assigned_variable)) {
                 printf("Codeline references invalid assigned_variable.\n");
                 return -1;
               }
-              if (!is_same_datatype(codeline->assigned_variable->data_type, function->return_datatype)) {
+              if (codeline->assigned_variable->data_type != function->return_datatype) {
                 printf("Codeline is trying to return a variable of the wrong type.\n");
                 return -1;
               }
@@ -276,11 +454,11 @@ int assert_full_structure_integrity(struct Function_T * first_function) {
             
             case CODELINE_TYPE_IF:
             case CODELINE_TYPE_WHILE:
-              if (!is_variable_valid(function, codeline->function_arguments[0])) {
+              if (!is_variable_in_function(function, codeline->args[0])) {
                 printf("Codeline references invalid function argument.\n");
                 return -1;
               }
-              if (!is_variable_valid(function, codeline->function_arguments[1])) {
+              if (!is_variable_in_function(function, codeline->args[1])) {
                 printf("Codeline references invalid function argument.\n");
                 return -1;
               }
@@ -334,239 +512,40 @@ int assert_full_structure_integrity(struct Function_T * first_function) {
                 return -1;
               }
               break;
+            
+            case CODELINE_TYPE_POINTER_ASSIGNMENT:
+              if (!is_variable_in_function(function, codeline->assigned_variable)) {
+                printf("Codeline references invalid assigned_variable.\n");
+                return -1;
+              }
+              if (!is_variable_in_function(function, codeline->args[0])) {
+                printf("Codeline references invalid argument 0.\n");
+                return -1;
+              }
+              // Check that pointer types line up
+              data_type = datatype_pointer_jump(codeline->assigned_variable->data_type, codeline->assigned_variable_reference_count);
+              if (!data_type || data_type != datatype_pointer_jump(codeline->args[0]->data_type, codeline->arg0_reference_count)) {
+                printf("Codeline pointer reference data types do not line up.\n");
+                return -1;
+              }
+              
+              break;
           }
           if (!codeline->next && function->last_codeline != codeline) {
-            printf("Function last codeline is not the last codeline.\n");
+            printf("Function last_codeline is not the last codeline.\n");
             return -1;
           }
           codeline = codeline->next;
         }
       }
     }
+    if (!function->next && function != environment->last_function) {
+      printf("Environment last_function is not the last function.\n");
+      return -1;
+    }
     function = function->next;
   }
   return 0;
 }
 
-struct Change_T * apply_change(struct Change_T * change) {
-  
-  struct Change_T * inverse_change = NULL;
-  struct Function_T * function = change->function;
-  
-  while (change) {
-    struct CodeLine_T * codeline = change->codeline;
-    struct Variable_T * variable = change->variable;
-    
-    struct Change_T * next_change = change->next;
-    
-    struct Variable_T * old_var;
-    union ConstantValue_T old_cons;
-    
-    // In each case, perform change and morph the change object to its inverse
-    switch (change->type) {
-      case CHANGE_TYPE_INSERT_CODELINE:
-        // Modify linked lists
-        codeline->next = change->next_codeline;
-        if (codeline->next) {
-          codeline->prev = change->next_codeline->prev;
-          change->next_codeline->prev = codeline;
-        }
-        else {
-          codeline->prev = function->last_codeline;
-          function->last_codeline = codeline;
-        }
-          
-        if (codeline->prev) {
-          codeline->prev->next = codeline;
-        }
-        else {
-          function->first_codeline = codeline;
-        }
-        codeline->parent_function = function;
-        
-        // Update reference counts
-        if (codeline->assigned_variable)
-          codeline->assigned_variable->references++;
-        
-        for (int i = 0; i < FUNCTION_ARG_COUNT; i++) {
-          if (!codeline->function_arguments[i])
-            break;
-          codeline->function_arguments[i]->references++;
-        }
-        
-        // Invert change object
-        change->type = CHANGE_TYPE_REMOVE_CODELINE;
-        break;
-        
-        
-      case CHANGE_TYPE_REMOVE_CODELINE:
-        // Invert change object
-        change->type = CHANGE_TYPE_INSERT_CODELINE;
-        change->next_codeline = codeline->next;
-      
-        // Modify linked lists
-        if (codeline->next)
-          codeline->next->prev = codeline->prev;
-        else
-          function->last_codeline = codeline->prev;
-        
-        if (codeline->prev)
-          codeline->prev->next = codeline->next;
-        else
-          function->first_codeline = codeline->next;
-        
-        codeline->next = NULL;
-        codeline->prev = NULL;
-        codeline->parent_function = NULL;
-        
-        // Update reference counts
-        if (codeline->assigned_variable)
-          codeline->assigned_variable->references--;
-        
-        for (int i = 0; i < FUNCTION_ARG_COUNT; i++) {
-          if (!codeline->function_arguments[i])
-            break;
-          codeline->function_arguments[i]->references--;
-        }
-        
-        break;
-      
-      
-      case CHANGE_TYPE_INSERT_VARIABLE:
-      
-        if (!variable->name[0]) {
-          // Find unused name if this variable had none previously
-          while(1) {
-            // Increment name
-            for (int i = 0; i < VARIABLE_NAME_LEN; i++) {
-              if (variable->name[i] == '\0') {
-                variable->name[i] = 'a';
-                break;
-              }
-              if (variable->name[i] < 'z'){
-                variable->name[i]++;
-                break;
-              }
-              variable->name[i] = 'a';
-            }
-            // Search for another like it
-            if (!variable_name_search(function->first_var, variable->name))
-              break; // Good find!
-          }
-        }
 
-        // Update linked lists
-        variable->next = NULL;
-        variable->prev = function->last_var;
-        
-        if (variable->prev)
-          variable->prev->next = variable;
-        else
-          function->first_var = variable;
-        
-        function->last_var = variable;
-        variable->parent_function = function;
-        variable->references = 0;
-        
-        // Invert change object
-        change->type = CHANGE_TYPE_REMOVE_VARIABLE;
-        
-        break;
-      
-      
-      case CHANGE_TYPE_REMOVE_VARIABLE:
-        if (variable->prev)
-          variable->prev->next = variable->next;
-        else
-          function->first_var = variable->next;
-        
-        if (variable->next)
-          variable->next->prev = variable->prev;
-        else
-          function->last_var = variable->prev;
-        
-        variable->prev = NULL;
-        variable->next = NULL;
-        variable->parent_function = NULL;
-        variable->references = 0;
-        
-        // Invert change object
-        change->type = CHANGE_TYPE_INSERT_VARIABLE;
-        break;
-      
-      
-      case CHANGE_TYPE_ALTER_CONSTANT:
-        old_cons = codeline->constant;
-        codeline->constant = change->constant;
-        
-        // Invert change object
-        change->constant = old_cons;
-        break;
-      
-      
-      case CHANGE_TYPE_ALTER_ASSIGNED_VARIABLE:
-        old_var = codeline->assigned_variable;
-        codeline->assigned_variable = variable;
-        
-        // Update reference counts
-        variable->references++;
-        old_var->references--;
-        
-        // Invert change object
-        change->variable = old_var;
-        break;
-      
-      case CHANGE_TYPE_ALTER_ARGUMENT:
-        old_var = codeline->function_arguments[change->argument_index];
-        codeline->function_arguments[change->argument_index] = variable;
-        
-        // Update reference counts
-        variable->references++;
-        old_var->references--;
-        
-        // Invert change object
-        change->variable = old_var;
-        break;
-      
-      default:
-        printf("Invalid change!\n");
-    }
-    
-    change->next = inverse_change;
-    inverse_change = change;
-    change = next_change;
-  }
-  
-    
-  if (assert_full_structure_integrity(get_first_function(function)))
-    exit(1);
-  
-  return inverse_change;
-}
-
-void free_change(struct Change_T * change) {
-  while (change) {
-    
-    switch (change->type) {
-      case CHANGE_TYPE_INSERT_CODELINE:
-        free(change->codeline);
-        break;
-      case CHANGE_TYPE_INSERT_VARIABLE:
-        free(change->variable);
-        break;
-      
-      // No actions required for these
-      case CHANGE_TYPE_REMOVE_CODELINE:
-      case CHANGE_TYPE_REMOVE_VARIABLE:
-      case CHANGE_TYPE_ALTER_ARGUMENT:
-      case CHANGE_TYPE_ALTER_ASSIGNED_VARIABLE:
-      case CHANGE_TYPE_ALTER_CONSTANT:
-        break;
-    }  
-    
-    // Free the world from the perils of change!
-    struct Change_T * change_to_free = change;
-    change = change->next;
-    free(change_to_free);
-  }
-}

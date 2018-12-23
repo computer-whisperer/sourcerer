@@ -35,25 +35,12 @@ char * concat_generated_lines(struct GeneratedLine_T * generated_lines, int max_
   return buffer;
 }
 
-void insert_type_string(struct DataType_T data_type, char* data, int* pos){
-  if (data_type.basic_type == BASICTYPE_CHAR) {
-    strcpy(data + *pos, "char");
-    *pos += 4;
-  }
-  if (data_type.basic_type == BASICTYPE_INT) {
-    strcpy(data + *pos, "int");
-    *pos += 3;
-  }
-  if (data_type.pointer_level) {
-    data[*pos] = ' ';
-    *pos += 1;
-    for (int i = 0; i < data_type.pointer_level; i++) {
-      data[*pos] = '*';
-      *pos += 1;
-    }
-  }
+void insert_type_string(struct DataType_T * data_type, char* data, int* pos){
+  
+  strcpy(data + *pos, data_type->name);
+  *pos += strlen(data_type->name);
   data[*pos] = ' ';
-  *pos += 1;
+  (*pos)++;
 }
 
 char * get_condition_string(enum Condition_T condition){
@@ -81,7 +68,7 @@ struct GeneratedLine_T * generate_c(struct Function_T* function){
   struct GeneratedLine_T ** last_link = &start_line;
   struct GeneratedLine_T * new_line;
 
-  int j;
+  int i, j;
   while (function) {
     
     if (function->type == FUNCTION_TYPE_CUSTOM) {
@@ -98,12 +85,12 @@ struct GeneratedLine_T * generate_c(struct Function_T* function){
       j += 1;
       // insert arguments
       for (int k = 0; k < FUNCTION_ARG_COUNT; k++) {
-        if (!function->function_arguments[k])
+        if (!function->args[k])
           break;
-        insert_type_string(function->function_arguments[k]->data_type, new_line->text, &j);
-        strcpy(new_line->text + j, function->function_arguments[k]->name);
-        j += strlen(function->function_arguments[k]->name);
-        if (k < FUNCTION_ARG_COUNT - 1 && function->function_arguments[k+1]) {
+        insert_type_string(function->args[k]->data_type, new_line->text, &j);
+        strcpy(new_line->text + j, function->args[k]->name);
+        j += strlen(function->args[k]->name);
+        if (k < FUNCTION_ARG_COUNT - 1 && function->args[k+1]) {
           strcpy(new_line->text + j, ", ");
           j += 2;
         }
@@ -113,7 +100,7 @@ struct GeneratedLine_T * generate_c(struct Function_T* function){
       new_line->text[j+2] = '\0';
       indent_level++;
       // Add scope variable definitions
-      struct Variable_T * variable = function->first_var;
+      struct Variable_T * variable = function->first_variable;
       while (variable) {
         if (!variable->is_arg) {
           new_line = malloc(sizeof(struct GeneratedLine_T));
@@ -156,13 +143,13 @@ struct GeneratedLine_T * generate_c(struct Function_T* function){
               j += strlen(codeline->assigned_variable->name);
               strcpy(new_line->text + j, " = ");
               j += 3;
-              strcpy(new_line->text + j, codeline->function_arguments[0]->name);
-              j += strlen(codeline->function_arguments[0]->name);
+              strcpy(new_line->text + j, codeline->args[0]->name);
+              j += strlen(codeline->args[0]->name);
               strcpy(new_line->text + j, " + ");
               j += 3;
               new_line->text[j-2] = codeline->target_function->name[0];
-              strcpy(new_line->text + j, codeline->function_arguments[1]->name);
-              j += strlen(codeline->function_arguments[1]->name);
+              strcpy(new_line->text + j, codeline->args[1]->name);
+              j += strlen(codeline->args[1]->name);
               strcpy(new_line->text + j, ";\0");
             }
             else {
@@ -180,11 +167,11 @@ struct GeneratedLine_T * generate_c(struct Function_T* function){
               strcpy(new_line->text + j, "(");
               j += 1;
               for (int k = 0; k < FUNCTION_ARG_COUNT; k++) {
-                if (!codeline->function_arguments[k])
+                if (!codeline->args[k])
                   break;
-                strcpy(new_line->text + j, codeline->function_arguments[k]->name);
-                j += strlen(codeline->function_arguments[k]->name);
-                if (k < FUNCTION_ARG_COUNT - 1 && codeline->function_arguments[k+1]) {
+                strcpy(new_line->text + j, codeline->args[k]->name);
+                j += strlen(codeline->args[k]->name);
+                if (k < FUNCTION_ARG_COUNT - 1 && codeline->args[k+1]) {
                   strcpy(new_line->text + j, ", ");
                   j += 2;
                 }
@@ -193,7 +180,7 @@ struct GeneratedLine_T * generate_c(struct Function_T* function){
             }
             break;
           case CODELINE_TYPE_CONSTANT_ASSIGNMENT:
-            if (codeline->assigned_variable->data_type.basic_type == BASICTYPE_CHAR) {
+            if (!strcmp(codeline->assigned_variable->data_type->name, "char")) {
               unsigned char value = codeline->constant.c;
               // for example: a = (char)004;
               while (j < indent_level*SPACES_PER_INDENT) {
@@ -223,7 +210,7 @@ struct GeneratedLine_T * generate_c(struct Function_T* function){
               }
               strcpy(new_line->text + j, ";");
             }
-            if (codeline->assigned_variable->data_type.basic_type == BASICTYPE_INT) {
+            if (!strcmp(codeline->assigned_variable->data_type->name, "int")) {
               // Determine sign and calculate number of chars required for the number
               int value = codeline->constant.i;
               int const_len = 0;
@@ -264,6 +251,31 @@ struct GeneratedLine_T * generate_c(struct Function_T* function){
               strcpy(new_line->text + j, ";\0");
             }
             break;
+          case CODELINE_TYPE_POINTER_ASSIGNMENT:
+              while (j < indent_level*SPACES_PER_INDENT) {
+                new_line->text[j] = ' ';
+                j++;
+              }
+              for (i = 0; i < codeline->assigned_variable_reference_count; i++) {
+                new_line->text[j] = '*';
+                j++;
+              }
+              strcpy(new_line->text + j, codeline->assigned_variable->name);
+              j += strlen(codeline->assigned_variable->name);
+              strcpy(new_line->text + j, " = ");
+              j += 3;
+              if (codeline->arg0_reference_count < 0) {
+                new_line->text[j] = '&';
+                j++;
+              }
+              for (i = 0; i < codeline->arg0_reference_count; i++) {
+                new_line->text[j] = '*';
+                j++;
+              }
+              strcpy(new_line->text + j, codeline->args[0]->name);
+              j += strlen(codeline->args[0]->name);
+              strcpy(new_line->text + j, ";\0");
+            break;
           case CODELINE_TYPE_IF:
             while (j < indent_level*SPACES_PER_INDENT) {
               new_line->text[j] = ' ';
@@ -271,13 +283,13 @@ struct GeneratedLine_T * generate_c(struct Function_T* function){
             }
             strcpy(new_line->text + j, "if (");
             j += 4;
-            strcpy(new_line->text + j, codeline->function_arguments[0]->name);
-            j += strlen(codeline->function_arguments[0]->name);
+            strcpy(new_line->text + j, codeline->args[0]->name);
+            j += strlen(codeline->args[0]->name);
             cond_string = get_condition_string(codeline->condition);
             strcpy(new_line->text + j, cond_string);
             j += strlen(cond_string);
-            strcpy(new_line->text + j, codeline->function_arguments[1]->name);
-            j += strlen(codeline->function_arguments[1]->name);
+            strcpy(new_line->text + j, codeline->args[1]->name);
+            j += strlen(codeline->args[1]->name);
             strcpy(new_line->text + j, "){");
             
             indent_level++;
@@ -289,13 +301,13 @@ struct GeneratedLine_T * generate_c(struct Function_T* function){
             }
             strcpy(new_line->text + j, "while (");
             j += 7;
-            strcpy(new_line->text + j, codeline->function_arguments[0]->name);
-            j += strlen(codeline->function_arguments[0]->name);
+            strcpy(new_line->text + j, codeline->args[0]->name);
+            j += strlen(codeline->args[0]->name);
             cond_string = get_condition_string(codeline->condition);
             strcpy(new_line->text + j, cond_string);
             j += strlen(cond_string);
-            strcpy(new_line->text + j, codeline->function_arguments[1]->name);
-            j += strlen(codeline->function_arguments[1]->name);
+            strcpy(new_line->text + j, codeline->args[1]->name);
+            j += strlen(codeline->args[1]->name);
             strcpy(new_line->text + j, "){");
             
             indent_level++;

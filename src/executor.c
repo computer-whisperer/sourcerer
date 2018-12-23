@@ -1,18 +1,20 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
+#include "membox.h"
 #include "c_types.h"
 #include "executor.h"
 
 int executor_evaluate_condition(struct CodeLine_T * codeline) {
   int a, b;
-  if (codeline->function_arguments[0]->data_type.basic_type == BASICTYPE_CHAR) {
-    a = codeline->function_arguments[0]->executor_top_varframe->value.c;
-    b = codeline->function_arguments[1]->executor_top_varframe->value.c;
+  if (codeline->args[0]->data_type == codeline->function->environment->char_datatype) {
+    a = *(char *)codeline->args[0]->executor_top_varframe->data_start;
+    b = *(char *)codeline->args[1]->executor_top_varframe->data_start;
   }
   else {
-    a = codeline->function_arguments[0]->executor_top_varframe->value.i;
-    b = codeline->function_arguments[1]->executor_top_varframe->value.i;
+    a = *(int *)codeline->args[0]->executor_top_varframe->data_start;
+    b = *(int *)codeline->args[1]->executor_top_varframe->data_start;
   }
   switch (codeline->condition) {
     case CONDITION_EQUAL:
@@ -31,61 +33,56 @@ int executor_evaluate_condition(struct CodeLine_T * codeline) {
   return 0;
 }
 
-union ExecutorValue_T execute_function(struct Function_T * function, union ExecutorValue_T * args, struct ExecutorPerformanceReport_T * report, int execution_limit){
-  
-  // Setup report
-  struct ExecutorPerformanceReport_T r;
-  if (!report)
-    report = &r;
-  report->lines_executed = 0;
-  report->did_return = 0;
-  report->uninitialized_vars_referenced = 0;
-  report->total_lines = 0;
-  
-  struct CodeLine_T * codeline = function->first_codeline;
-  while (codeline){
-    report->total_lines++;
-    codeline = codeline->next;
-  }
-    
-  
+int execute_function(struct Function_T * function, struct MemoryDMZ_T * dmz, void * arguments_data[], size_t arguments_size[], void * return_data, size_t return_size, int execution_limit){
+
+  // Add membox to dmz
+  struct MemoryDMZ_T my_dmz = {.start=function->environment->membox->data_start, .start=function->environment->membox->data_end, .next=dmz};
+  dmz = &my_dmz;
+
   // Allocate memory for per-variable stack frames
-  union ExecutorValue_T sub_args[FUNCTION_ARG_COUNT];
-  struct Variable_T * variable = function->first_var;
+  struct Variable_T * variable = function->first_variable;
   while (variable) {
     struct ExecutorVariableFrame_T * newframe = malloc(sizeof(struct ExecutorVariableFrame_T));
     newframe->next = variable->executor_top_varframe;
-    newframe->value.i = 0;
+    newframe->data_start = membox_malloc(function->environment->membox, variable->data_type->size);
+    if (!newframe->data_start) {
+      printf("membox malloc failed!\n");
+      exit(1);
+    }
     variable->executor_top_varframe = newframe;
-    variable->executor_initialized = 0;
     variable = variable->next;
   }
-
-  // Set incoming arguments
-  for (int i = 0; i < FUNCTION_ARG_COUNT; i++) {
-    if (!function->function_arguments[i])
-      break;
-    function->function_arguments[i]->executor_top_varframe->value = args[i];
-    function->function_arguments[i]->executor_initialized = 1;
+  
+  // Load argument_data into the stack frames
+  if (arguments_data) {
+    for (int i = 0; i < FUNCTION_ARG_COUNT; i++) {
+      if (!function->args[i] || !arguments_data[i] || arguments_size[i] <= 0)
+        break;
+      if (function->args[i]->data_type->size < arguments_size[i])
+        arguments_size[i] = function->args[i]->data_type->size;
+      memcpy(function->args[i]->executor_top_varframe->data_start, arguments_data[i], arguments_size[i]);
+    }
   }
-
-  union ExecutorValue_T rval = (union ExecutorValue_T){.ptr=NULL};
+  
+  void * sub_arguments_data[FUNCTION_ARG_COUNT];
+  int sub_arguments_size[FUNCTION_ARG_COUNT];
+  
+  long a, b, c;
   
   // Execute codelines
-  codeline = function->first_codeline;
+  struct CodeLine_T * codeline = function->first_codeline;
   struct CodeLine_T * next_codeline = NULL;
   int lines_executed = 0;
   int returned = 0;
   while (1) {
     if (!codeline || returned) {
-      report->did_return = 1;
       break;
     }
     
     lines_executed++;
-    report->lines_executed++;
+    function->executor_report.lines_executed++;
     if (execution_limit && lines_executed > execution_limit) {
-      report->did_return = 0;
+      function->executor_report.times_not_returned++;
       break;
     }
     
@@ -93,114 +90,114 @@ union ExecutorValue_T execute_function(struct Function_T * function, union Execu
     switch (codeline->type) {
       
       case CODELINE_TYPE_CONSTANT_ASSIGNMENT:
-        codeline->assigned_variable->executor_top_varframe->value.i = codeline->constant.i;
-        // Mark assigned variable as initialized
-        codeline->assigned_variable->executor_initialized = 1;
+        if (codeline->assigned_variable->data_type == function->environment->char_datatype)
+          *(char *)codeline->assigned_variable->executor_top_varframe->data_start = codeline->constant.c;
+        else if (codeline->assigned_variable->data_type == function->environment->int_datatype)
+          *(int *)codeline->assigned_variable->executor_top_varframe->data_start = codeline->constant.i;
         break;
+      /*
+      case CODELINE_TYPE_POINTER_ASSIGNMENT:
         
+        break;
+      */
       case CODELINE_TYPE_RETURN:
-        // Penalize usage of uninitialized variables
-        if (!codeline->assigned_variable->executor_initialized)
-          report->uninitialized_vars_referenced++;
-        rval = codeline->assigned_variable->executor_top_varframe->value;        
+        if (return_size > codeline->assigned_variable->data_type->size)
+          return_size = codeline->assigned_variable->data_type->size;
+        if (return_data && return_size > 0)
+          memcpy(return_data, codeline->assigned_variable->executor_top_varframe->data_start, return_size);
         returned = 1;
         break;
         
       case CODELINE_TYPE_FUNCTION_CALL:
-        // Penalize usage of uninitialized variables
-        for (int i = 0; i < FUNCTION_ARG_COUNT; i++) {
-          if (!codeline->target_function->function_arguments[i])
-            break;
-          if (!codeline->function_arguments[i]->executor_initialized)
-            report->uninitialized_vars_referenced++;
-        }
         switch (codeline->target_function->type) {
           
           case FUNCTION_TYPE_BASIC_OP:
+            a = *(int*)codeline->args[0]->executor_top_varframe->data_start;
+            b = *(int*)codeline->args[1]->executor_top_varframe->data_start;
+            c = 0;
             switch (codeline->target_function->name[0]) {
-              // Assuming all integer arguments for now, probably a bad idea
               case '+':
-                codeline->assigned_variable->executor_top_varframe->value.i = codeline->function_arguments[0]->executor_top_varframe->value.i + codeline->function_arguments[1]->executor_top_varframe->value.i;
+                c = a + b;
                 break;
               case '-':
-                codeline->assigned_variable->executor_top_varframe->value.i = codeline->function_arguments[0]->executor_top_varframe->value.i - codeline->function_arguments[1]->executor_top_varframe->value.i;
+                c = a - b;
                 break;
               case '*':
-                codeline->assigned_variable->executor_top_varframe->value.i = codeline->function_arguments[0]->executor_top_varframe->value.i * codeline->function_arguments[1]->executor_top_varframe->value.i;
+                c = a * b;
                 break;
               case '/':
-                if (codeline->function_arguments[1]->executor_top_varframe->value.i == 0)
+                if (b == 0)
                   break;
-                codeline->assigned_variable->executor_top_varframe->value.i = (double)codeline->function_arguments[0]->executor_top_varframe->value.i / (double)codeline->function_arguments[1]->executor_top_varframe->value.i;
+                c = a / b;
+                break;
+              case '%':
+                if (b <= 0)
+                  break;
+                c = a % b;
                 break;
             }
+            *(int*)codeline->assigned_variable->executor_top_varframe->data_start = c;
             break;
             
           case FUNCTION_TYPE_BUILTIN:
             // For now assume putchar, also a really bad idea :)
-            //putchar(codeline->function_arguments[0]->executor_top_varframe->value.c);
+            //putchar(codeline->args[0]->executor_top_varframe->value.c);
             if (putchar_i < PUTCHAR_BUFF_LEN) {
-              putchar_buff[putchar_i] = codeline->function_arguments[0]->executor_top_varframe->value.c;
-              codeline->assigned_variable->executor_top_varframe->value.c = codeline->function_arguments[0]->executor_top_varframe->value.c;
+              putchar_buff[putchar_i] = *(char *)codeline->args[0]->executor_top_varframe->data_start;
+              *(char *)codeline->assigned_variable->executor_top_varframe->data_start = *(char *)codeline->args[0]->executor_top_varframe->data_start;
               putchar_i++;
             }
             break;
             
           case FUNCTION_TYPE_CUSTOM:
-            
             for (int i = 0; i < FUNCTION_ARG_COUNT; i++) {
-              if (!codeline->function_arguments[i])
+              if (!codeline->args[i]) {
+                sub_arguments_data[i] = NULL;
+                sub_arguments_size[i] = 0;
                 break;
-              sub_args[i] = codeline->function_arguments[i]->executor_top_varframe->value;
+              }
+              sub_arguments_data[i] = codeline->args[i]->executor_top_varframe->data_start;
+              sub_arguments_size[i] = codeline->args[i]->data_type->size;
             }
-            codeline->assigned_variable->executor_top_varframe->value = execute_function(codeline->target_function, sub_args, report, execution_limit);
+            lines_executed += execute_function(codeline->target_function, NULL, sub_arguments_data, sub_arguments_size, codeline->assigned_variable->executor_top_varframe->data_start, codeline->assigned_variable->data_type->size, execution_limit - lines_executed);
             break;
-            
-          // Mark assigned variable as initialized
-          codeline->assigned_variable->executor_initialized = 1;
         }
         break;
         
       case CODELINE_TYPE_IF:
-        // Penalize usage of uninitialized variables
-        for (int i = 0; i < 2; i++)
-          if (!codeline->function_arguments[i]->executor_initialized)
-            report->uninitialized_vars_referenced++;
         if (!executor_evaluate_condition(codeline))
           next_codeline = codeline->block_other_end->next;
         break;
         
       case CODELINE_TYPE_WHILE:
-        // Penalize usage of uninitialized variables
-        for (int i = 0; i < 2; i++)
-          if (!codeline->function_arguments[i]->executor_initialized)
-            report->uninitialized_vars_referenced++;
         if (!executor_evaluate_condition(codeline))
           next_codeline = codeline->block_other_end->next;
         break;
         
       case CODELINE_TYPE_BLOCK_END:
         if (codeline->block_other_end->type == CODELINE_TYPE_WHILE) {
-          // Penalize usage of uninitialized variables
-          for (int i = 0; i < 2; i++)
-            if (!codeline->block_other_end->function_arguments[i]->executor_initialized)
-              report->uninitialized_vars_referenced++;
-            
           if (executor_evaluate_condition(codeline->block_other_end))
             next_codeline = codeline->block_other_end->next; // Handle while loop return
         }
+        break;
+      
+      default:
         break;
         
     }
     codeline = next_codeline;
   }
   // Free stack frames
-  variable = function->first_var;
+  variable = function->first_variable;
   while (variable) {
     struct ExecutorVariableFrame_T * frame = variable->executor_top_varframe;
     variable->executor_top_varframe = variable->executor_top_varframe->next;
+    membox_free(function->environment->membox, frame->data_start);
     free(frame);
     variable = variable->next;
   }
-  return rval;
+  
+  // For now, reset the memory now
+  reset_membox(function->environment->membox);
+  return lines_executed;
 }

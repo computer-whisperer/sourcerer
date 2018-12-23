@@ -1,35 +1,67 @@
+#include "membox.h"
+
 #ifndef C_TYPES_H
 #define C_TYPES_H
 
 #define FUNCTION_ARG_COUNT 8
-#define FUNCTION_NAME_LEN 32
-#define VARIABLE_NAME_LEN 32
+#define NAME_LEN 32
+#define STRUCT_MEMBER_LEN 8
 #define CODELINE_LEN 128
 
-enum BasicDataType_T {
-  BASICTYPE_INT, 
-  BASICTYPE_CHAR,
-  BASICTYPE_COUNT,
+#define MAX_POINTER_DEPTH 3
+
+
+struct ExecutorVariableFrame_T {
+  void * data_start;
+  struct ExecutorVariableFrame_T * next;
+};
+
+struct ExecutorPerformanceReport_T {
+  int lines_executed;
+  int times_not_returned;
+};
+
+
+struct StructDataTypeMember_T {
+  char name[NAME_LEN];
+  struct DataType_T * data_type;
+};
+
+enum DataTypeType_T {
+  DATATYPETYPE_PRIMITIVE,
+  DATATYPETYPE_POINTER,
+  DATATYPETYPE_STRUCT,
 };
 
 struct DataType_T {
-  enum BasicDataType_T basic_type;
-  short pointer_level;
+  enum DataTypeType_T type;
+  char name[NAME_LEN];
+  size_t size;
+  struct StructDataTypeMember_T struct_members[STRUCT_MEMBER_LEN];
+  
+  // Pointer links
+  struct DataType_T * pointed_from;
+  struct DataType_T * pointing_to;
+  int pointer_degree;
+  
+  // Linked list
+  struct Environment_T * environment;
+  struct DataType_T * next;
+  struct DataType_T * prev;
 };
 
 struct Variable_T {
-  char name[VARIABLE_NAME_LEN];
-  struct DataType_T data_type;
+  char name[NAME_LEN];
+  struct DataType_T * data_type;
   short is_arg;
   
   int references; // Reference counter
   
   // Interpreter fields
   struct ExecutorVariableFrame_T * executor_top_varframe;
-  int executor_initialized;
   
   // Linked list vars
-  struct Function_T * parent_function;
+  struct Function_T * function;
   struct Variable_T * next;
   struct Variable_T * prev;
 };
@@ -56,22 +88,27 @@ enum CodeLineType_T{
   CODELINE_TYPE_IF,
   CODELINE_TYPE_BLOCK_END,
   CODELINE_TYPE_RETURN,
+  CODELINE_TYPE_POINTER_ASSIGNMENT,
   CODELINE_TYPE_COUNT
 };
 
 struct CodeLine_T {
   enum CodeLineType_T type;
+  
+  int assigned_variable_reference_count; // Used with pointer assignment type
   struct Variable_T * assigned_variable;
   union ConstantValue_T constant;
   struct Function_T * target_function;
-  struct Variable_T * function_arguments[FUNCTION_ARG_COUNT];
+  
+  int arg0_reference_count; // Used with pointer assignment type
+  struct Variable_T * args[FUNCTION_ARG_COUNT];
   
   // For ifs and whiles
   struct CodeLine_T * block_other_end;
   enum Condition_T condition; // Condition is between first two arguments
   
   // Linked list vars
-  struct Function_T * parent_function;
+  struct Function_T * function;
   struct CodeLine_T * next;
   struct CodeLine_T * prev;
 };
@@ -85,65 +122,62 @@ enum FunctionType_T {
 
 struct Function_T {
   enum FunctionType_T type;
-  char name[FUNCTION_NAME_LEN];
+  char name[NAME_LEN];
   
   // Links to argument variables
-  struct Variable_T * function_arguments[FUNCTION_ARG_COUNT];
+  struct Variable_T * args[FUNCTION_ARG_COUNT];
   
-  struct DataType_T return_datatype;
+  struct DataType_T * return_datatype;
   
   // Codeline linked list
   struct CodeLine_T * first_codeline;
   struct CodeLine_T * last_codeline;
   
+  int codeline_count;
+  struct ExecutorPerformanceReport_T executor_report;
+  
+  // Data for source replication
+  int original_source_offset;
+  
   // Variable linked list
-  struct Variable_T * first_var;
-  struct Variable_T * last_var;
+  struct Variable_T * first_variable;
+  struct Variable_T * last_variable;
   
   // Previous and next functions
+  struct Environment_T * environment;
   struct Function_T * prev;
   struct Function_T * next;
 };
 
-enum ChangeType_T {
-  CHANGE_TYPE_INSERT_CODELINE,
-  CHANGE_TYPE_REMOVE_CODELINE,
-  CHANGE_TYPE_INSERT_VARIABLE,
-  CHANGE_TYPE_REMOVE_VARIABLE,
-  CHANGE_TYPE_ALTER_CONSTANT,
-  CHANGE_TYPE_ALTER_ARGUMENT,
-  CHANGE_TYPE_ALTER_ASSIGNED_VARIABLE,
+struct Environment_T {
+  char name[NAME_LEN];
+  struct Function_T * first_function;
+  struct Function_T * last_function;
+  struct Function_T * main;
+  
+  struct DataType_T * first_datatype;
+  struct DataType_T * last_datatype;
+  
+  // Data for source replication
+  char * original_source_text;
+  int original_source_text_len;
+  
+  char * source_code
+  
+  // Environment memory space
+  struct Membox_T * membox;
+  
+  // Fixed datatypes for executor
+  struct DataType_T * char_datatype;
+  struct DataType_T * int_datatype;
 };
 
-struct Change_T {
-  enum ChangeType_T type;
-  
-  struct Function_T * function;
-  
-  struct CodeLine_T * codeline;
-  struct Variable_T * variable;
-  union ConstantValue_T constant;
-  int argument_index;
-  
-  struct CodeLine_T * next_codeline; // Used to position inserts
-  
-  struct Change_T * next;
-};
-
-struct Function_T * get_first_function(struct Function_T * function);
-struct Function_T * get_last_function(struct Function_T * function);
-
-struct Function_T * build_main_four_args();
+struct DataType_T * datatype_pointer_jump(struct DataType_T * origin, int reference_count);
 
 struct Variable_T * variable_name_search(struct Variable_T * var, char * name);
 
-struct Function_T * build_context();
+struct Environment_T * build_new_environment(char name[NAME_LEN], size_t membox_size);
 
-int is_same_datatype(struct DataType_T a, struct DataType_T b);
-
-int assert_full_structure_integrity(struct Function_T * first_function);
-
-struct Change_T * apply_change(struct Change_T * change);
-void free_change(struct Change_T * change);
+int assert_environment_integrity(struct Environment_T * environment);
 
 #endif  // C_TYPES_H

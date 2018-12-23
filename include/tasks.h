@@ -14,12 +14,14 @@ struct TaskInputs_T {
 struct TaskOutputs_T {
   char * putchar_text;
   int putchar_text_len;
-  union ExecutorValue_T ret;
+  int ret;
 };
 
 typedef int (*TaskJudge_T)(struct TaskInputs_T * last_task_inputs, struct TaskOutputs_T * last_task_outputs, struct TaskInputs_T * next_task_inputs);
 
 int task_judge_hello_world(struct TaskInputs_T * last_task_inputs, struct TaskOutputs_T * last_task_outputs, struct TaskInputs_T * next_task_inputs);
+
+int task_judge_flip_number(struct TaskInputs_T * last_task_inputs, struct TaskOutputs_T * last_task_outputs, struct TaskInputs_T * next_task_inputs);
 
 int task_judge_count(struct TaskInputs_T * last_task_inputs, struct TaskOutputs_T * last_task_outputs, struct TaskInputs_T * next_task_inputs);
 

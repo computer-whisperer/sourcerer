@@ -1,4 +1,9 @@
-int main(){
+
+int main() {
+  hi();
+}
+
+int hi(){
   int result;
   int i;
   int char_spacing;
