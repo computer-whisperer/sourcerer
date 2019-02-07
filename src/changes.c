@@ -199,9 +199,8 @@ struct Change_T * apply_change(struct Change_T * change) {
     inverse_change = change;
     change = next_change;
   }
-  
-    
-  if (fast_rand() % 1000 && assert_environment_integrity(function->environment))
+  //fast_rand() % 1000 &&
+  if ( assert_environment_integrity(function->environment))
     exit(1);
   
   return inverse_change;

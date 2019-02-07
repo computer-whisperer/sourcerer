@@ -19,7 +19,7 @@ int task_judge_expfit(struct TaskInputs_T * last_task_inputs, struct TaskOutputs
   if (next_task_inputs->run_index == 10)
     next_task_inputs->run_index = -1;
   else {
-    next_task_inputs->a = fast_rand_seeded(next_task_inputs->run_index) % 10;
+    next_task_inputs->a = next_task_inputs->run_index;
   }
   
   return score;

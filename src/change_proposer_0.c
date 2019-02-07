@@ -275,7 +275,7 @@ struct Change_T * propose_random_change(struct Function_T * function) {
       change->codeline = codeline;
     }
   }
-  else if (r < 65 || !codeline) {
+  else if (r < 85 || !codeline) {
     // Insert new line before the current line
     struct CodeLine_T * new_codeline = malloc(sizeof(struct CodeLine_T));
     new_codeline->assigned_variable = NULL;
@@ -316,6 +316,7 @@ struct Change_T * propose_random_change(struct Function_T * function) {
       // This loop will exit randomly, more likely on a good decision.
       int done = 0;
       while (!done) {
+    	new_codeline->args[1] = NULL;
         new_codeline->assigned_variable_reference_count = 0;
         new_codeline->arg0_reference_count = 0;
         
@@ -364,6 +365,10 @@ struct Change_T * propose_random_change(struct Function_T * function) {
           current_target_datatype = current_target_datatype->pointed_from;
           if (current_target_datatype)
             new_codeline->arg0_reference_count++;
+        }
+        // Add an int to the result if it is compatible
+        if (datatype_pointer_jump(new_codeline->assigned_variable->data_type, new_codeline->assigned_variable_reference_count)->type == DATATYPETYPE_POINTER) {
+          new_codeline->args[1] = find_random_variable(function, function->environment->int_datatype, 0);
         }
         
       }

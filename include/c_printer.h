@@ -10,7 +10,10 @@ struct GeneratedLine_T {
   struct GeneratedLine_T* next;
 };
 
+
+
 void print_function(struct Function_T * function);
+char * print_function_to_buffer(struct Function_T * function);
 void print_function_limited(struct Function_T * function);
 
 #endif // C_PRINTER_H

@@ -18,6 +18,7 @@ struct ExecutorVariableFrame_T {
 
 struct ExecutorPerformanceReport_T {
   int lines_executed;
+  int segfaults_attempted;
   int times_not_returned;
 };
 
@@ -158,11 +159,9 @@ struct Environment_T {
   struct DataType_T * first_datatype;
   struct DataType_T * last_datatype;
   
-  // Data for source replication
-  char * original_source_text;
-  int original_source_text_len;
-  
-  char * source_code
+  // All the code sourcerer shouldn't change
+  char * protected_code_text;
+  int protected_code_len;
   
   // Environment memory space
   struct Membox_T * membox;
@@ -172,11 +171,15 @@ struct Environment_T {
   struct DataType_T * int_datatype;
 };
 
+void free_function(struct Function_T * function);
+
 struct DataType_T * datatype_pointer_jump(struct DataType_T * origin, int reference_count);
 
 struct Variable_T * variable_name_search(struct Variable_T * var, char * name);
 
-struct Environment_T * build_new_environment(char name[NAME_LEN], size_t membox_size);
+struct Environment_T * build_new_environment(size_t membox_size);
+
+void randomly_populate_function(struct Function_T * function, int codeline_count);
 
 int assert_environment_integrity(struct Environment_T * environment);
 

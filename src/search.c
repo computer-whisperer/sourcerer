@@ -32,6 +32,7 @@ int get_fitness(struct Function_T * function, TaskJudge_T task_judge) {
     
     function->executor_report.lines_executed = 0;
     function->executor_report.times_not_returned = 0;
+    function->executor_report.segfaults_attempted = 0;
     
     putchar_i = 0;
     execute_function(function, NULL, function_args_data, function_args_size, return_data, return_size, 200);
@@ -45,6 +46,7 @@ int get_fitness(struct Function_T * function, TaskJudge_T task_judge) {
     score += task_judge(&last_inputs, &last_outputs, &next_inputs);
     
     score -= function->executor_report.times_not_returned*1000;
+    score -= function->executor_report.segfaults_attempted*500;
     score -= function->executor_report.lines_executed;
     score -= function->codeline_count;
     

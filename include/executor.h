@@ -6,8 +6,9 @@
 #define PUTCHAR_BUFF_LEN 50
 
 struct MemoryDMZ_T {
-  void * start;
-  void * end;
+  void * data_start;
+  void * data_end;
+  char writable;
   struct MemoryDMZ_T * next;
 };
 

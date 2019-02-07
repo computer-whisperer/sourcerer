@@ -99,6 +99,18 @@ struct GeneratedLine_T * generate_c(struct Function_T* function){
       new_line->text[j+1] = '{';
       new_line->text[j+2] = '\0';
       indent_level++;
+      // Add sourcerer function macro
+      /*
+      new_line = malloc(sizeof(struct GeneratedLine_T));
+      *last_link = new_line;
+      last_link = &(new_line->next);
+      j = 0;
+      while (j < indent_level*SPACES_PER_INDENT) {
+        new_line->text[j] = ' ';
+        j++;
+      }
+      strcpy(new_line->text+j, "SOURCERER_FUNCTION()");
+      */
       // Add scope variable definitions
       struct Variable_T * variable = function->first_variable;
       while (variable) {
@@ -274,6 +286,13 @@ struct GeneratedLine_T * generate_c(struct Function_T* function){
               }
               strcpy(new_line->text + j, codeline->args[0]->name);
               j += strlen(codeline->args[0]->name);
+              
+              if (codeline->args[1]) {
+                strcpy(new_line->text + j, " + ");
+                j += 3;
+                strcpy(new_line->text + j, codeline->args[1]->name);
+                j += strlen(codeline->args[1]->name);
+              }
               strcpy(new_line->text + j, ";\0");
             break;
           case CODELINE_TYPE_IF:
@@ -374,6 +393,18 @@ void print_function(struct Function_T * function) {
     generated = generated->next;
     free(tofree);
   }
+}
+
+char * print_function_to_buffer(struct Function_T * function) {
+  struct GeneratedLine_T * generated = generate_c(function);
+  struct GeneratedLine_T * tofree;
+  char * text = concat_generated_lines(generated, -1);
+  while (generated) {
+    tofree = generated;
+    generated = generated->next;
+    free(tofree);
+  }
+  return text;
 }
 
 void print_function_limited(struct Function_T * function) {

@@ -12,6 +12,8 @@ struct Membox_T * build_membox(size_t len) {
   membox->last_freeblock = membox->first_freeblock;
   membox->first_freeblock->data_start = membox->data_start;
   membox->first_freeblock->data_end = membox->data_end;
+  membox->first_freeblock->next = NULL;
+  membox->first_freeblock->prev = NULL;
   return membox;
 }
 

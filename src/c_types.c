@@ -4,6 +4,8 @@
 
 #include "membox.h"
 #include "c_types.h"
+#include "changes.h"
+#include "change_proposers.h"
 
 
 int get_reference_count(struct Variable_T * var, struct Function_T * function) {
@@ -122,7 +124,7 @@ struct Function_T * add_new_function(struct Environment_T * environment, char na
   for (int i = 0; i < FUNCTION_ARG_COUNT; i++) {
     if (!argument_types[i]) {
       function->args[i] = NULL;
-      break;
+      continue;
     }
     // New variable
     struct Variable_T * variable = malloc(sizeof(struct Variable_T));
@@ -148,15 +150,58 @@ struct Function_T * add_new_function(struct Environment_T * environment, char na
   return function;
 }
 
-struct Environment_T * build_new_environment(char name[NAME_LEN], size_t membox_size) {
+void free_function(struct Function_T * function) {
+	struct Variable_T * variable = function->first_variable;
+	struct Variable_T * var_to_free;
+	while (variable) {
+		var_to_free = variable;
+		variable = variable->next;
+		free(var_to_free);
+	}
+
+	struct CodeLine_T * codeline = function->first_codeline;
+	struct CodeLine_T * codeline_to_free;
+	while (codeline){
+		codeline_to_free = codeline;
+		codeline = codeline->next;
+		free(codeline_to_free);
+	}
+
+	if (function->prev)
+		function->prev->next = function->next;
+	else
+		function->environment->first_function = function->next;
+
+	if (function->next)
+		function->next->prev = function->prev;
+	else
+		function->environment->last_function = function->prev;
+	free(function);
+}
+
+void randomly_populate_function(struct Function_T * function, int codeline_count) {
+  while (function->codeline_count < codeline_count) {
+    struct Change_T * change = propose_random_change(function);
+    if (change->type != CHANGE_TYPE_REMOVE_CODELINE)
+      free_change(apply_change(change));
+    else
+      free_change(change);
+  }
+}
+
+struct Environment_T * build_new_environment(size_t membox_size) {
   struct Environment_T * environment = malloc(sizeof(struct Environment_T));
+  environment->first_datatype = NULL;
+  environment->last_datatype = NULL;
+  environment->first_function = NULL;
+  environment->last_function = NULL;
   
   // Initialize basic datatypes
   environment->int_datatype = add_new_datatype(environment, (struct DataType_T){.type=DATATYPETYPE_PRIMITIVE, .name="int", .size=sizeof(int)});
   environment->char_datatype = add_new_datatype(environment, (struct DataType_T){.type=DATATYPETYPE_PRIMITIVE, .name="char", .size=sizeof(char)});
   
   // Add available functions
-  struct DataType_T * basic_int_args[] = {environment->int_datatype, environment->int_datatype, NULL};
+  struct DataType_T * basic_int_args[] = {environment->int_datatype, environment->int_datatype, NULL, NULL, NULL, NULL, NULL, NULL};
   add_new_function(environment, "+", environment->int_datatype, basic_int_args, FUNCTION_TYPE_BASIC_OP);
   add_new_function(environment, "-", environment->int_datatype, basic_int_args, FUNCTION_TYPE_BASIC_OP);
   add_new_function(environment, "*", environment->int_datatype, basic_int_args, FUNCTION_TYPE_BASIC_OP);
@@ -166,10 +211,11 @@ struct Environment_T * build_new_environment(char name[NAME_LEN], size_t membox_
   //struct DataType_T * fancy_int_args[] = {environment->char_datatype, environment->int_datatype, NULL};
   //add_new_function(environment, "+", environment->char_datatype, fancy_int_args, FUNCTION_TYPE_BASIC_OP);
   
-  struct DataType_T * putchar_args[] = {environment->char_datatype, NULL};
+  struct DataType_T * putchar_args[] = {environment->char_datatype, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
   add_new_function(environment, "putchar", environment->char_datatype, putchar_args, FUNCTION_TYPE_BUILTIN);
+  //add_new_function(environment, "farticus", environment->char_datatype, putchar_args, FUNCTION_TYPE_BUILTIN);
   
-  struct DataType_T * main_args[] = {environment->int_datatype, environment->int_datatype, environment->int_datatype, environment->char_datatype, NULL};
+  struct DataType_T * main_args[] = {environment->int_datatype, environment->int_datatype, environment->int_datatype, environment->char_datatype, NULL, NULL, NULL, NULL};
   environment->main = add_new_function(environment, "main", environment->int_datatype, main_args, FUNCTION_TYPE_CUSTOM);
   
   // Init memory box
@@ -527,6 +573,11 @@ int assert_environment_integrity(struct Environment_T * environment) {
               if (!data_type || data_type != datatype_pointer_jump(codeline->args[0]->data_type, codeline->arg0_reference_count)) {
                 printf("Codeline pointer reference data types do not line up.\n");
                 return -1;
+              }
+              // Verify that second argument only occurs if pointer types all around
+              if (codeline->args[1] && data_type->type != DATATYPETYPE_POINTER){
+            	  printf("Pointer assignment has integer addition but is not assigning to a pointer type!\n");
+            	  return -1;
               }
               
               break;

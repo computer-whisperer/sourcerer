@@ -1,8 +1,6 @@
 #include "sourcerer.h"
 #include "math.h"
 
-int do_a_thing(int a, int b);
-
 int main(int argc, char * argv[]) {
   // Initialize sourcerer
   struct Environment_T * env = build_new_environment(1000);
@@ -28,7 +26,6 @@ int main(int argc, char * argv[]) {
   //env->save_to_file("hello_world.c");
 }
 
-// SOURCERER_TARGET
 int do_a_thing(int a, int b) {
-  SOURCERER_REDIRECT(env, "do_a_thing", a, b);
+  SOURCERER_FUNCTION_REDIRECT(env, "do_a_thing", a, b);
 }
