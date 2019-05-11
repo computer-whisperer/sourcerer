@@ -236,7 +236,7 @@ struct Change_T * propose_random_change(struct Function_T * function) {
   // Found a random codeline, do something with it
   int r = fast_rand() % 100;
   
-  if (r < 40 && codeline && codeline->type != CODELINE_TYPE_RETURN) {
+  if (r < 10 && codeline && codeline->type != CODELINE_TYPE_RETURN) {
     if (codeline->type == CODELINE_TYPE_CONSTANT_ASSIGNMENT) {
       // Modify the constant
       union ConstantValue_T new_value;
@@ -275,7 +275,7 @@ struct Change_T * propose_random_change(struct Function_T * function) {
       change->codeline = codeline;
     }
   }
-  else if (r < 85 || !codeline) {
+  else if (r < 80 || !codeline) {
     // Insert new line before the current line
     struct CodeLine_T * new_codeline = malloc(sizeof(struct CodeLine_T));
     new_codeline->assigned_variable = NULL;
@@ -295,7 +295,7 @@ struct Change_T * propose_random_change(struct Function_T * function) {
     // Select type
     r = fast_rand() % 100;
 
-    if (r < 40) {
+    if (r < 20) {
       // constant assignment
       new_codeline->type = CODELINE_TYPE_CONSTANT_ASSIGNMENT;
       new_codeline->assigned_variable = find_random_variable(function, NULL, 0);
@@ -304,12 +304,12 @@ struct Change_T * propose_random_change(struct Function_T * function) {
       else
         new_codeline->constant.i = fast_rand() % 10 - 5; // Any int from -5 to +5
     }
-    else if (r < 45) {
+    else if (0) {
       // return
       new_codeline->type = CODELINE_TYPE_RETURN;
       new_codeline->assigned_variable = find_random_variable(function, function->return_datatype, 1);
     }
-    else if (r < 55) {
+    else if (r < 60) {
       // Pointer assignment
       new_codeline->type = CODELINE_TYPE_POINTER_ASSIGNMENT;
       
@@ -335,7 +335,7 @@ struct Change_T * propose_random_change(struct Function_T * function) {
         
         // Pick reference count (number of times to * it)
         while (new_codeline->assigned_variable->data_type->pointer_degree > new_codeline->assigned_variable_reference_count) {
-          if (fast_rand() % 3)
+          if (fast_rand() % 2)
             break;
           new_codeline->assigned_variable_reference_count++;
         }
@@ -352,12 +352,12 @@ struct Change_T * propose_random_change(struct Function_T * function) {
         // Try to find a matching variable
         while (current_target_datatype) {
           new_codeline->args[0] = find_random_variable(function, current_target_datatype, 1);
-          if (fast_rand() % 3 == 0) {
+          if (fast_rand() % 4 == 0) {
             // Sometimes, just go for it.
             done = 1;
             break;
           }
-          if (new_codeline->args[0]->name[0] && fast_rand() % 3 == 0) {
+          if (new_codeline->args[0]->name[0] && fast_rand() % 2 == 0) {
             // More likely to accept this if we are using an existing variable
             done = 1;
             break;
@@ -373,7 +373,7 @@ struct Change_T * propose_random_change(struct Function_T * function) {
         
       }
     }
-    else if (r < 85) {
+    else if (r < 70) {
       // function call
       new_codeline->type = CODELINE_TYPE_FUNCTION_CALL;
       
@@ -447,24 +447,19 @@ struct Change_T * propose_random_change(struct Function_T * function) {
       // Found where the block end goes
       second_change->next_codeline = second_codeline_ptr;
 
-      
-      if (r < 90) {
+      new_codeline->condition = fast_rand() % 6; // 6 possible conditions
+      new_codeline->args[0] = find_random_variable(function, NULL, 1);
+      new_codeline->args[1] = find_random_variable(function, new_codeline->args[0]->data_type, 1); // Copy the argument type from the first argument
+      new_codeline->args[2] = NULL;
+      // If the args are the same, set condition to ==
+      if (new_codeline->args[0] == new_codeline->args[1])
+      	new_codeline->condition = CONDITION_EQUAL;
+      if (r < 90)
         // if statement
         new_codeline->type = CODELINE_TYPE_IF;
-        new_codeline->condition = fast_rand() % 6; // 6 possible conditions
-        new_codeline->args[0] = find_random_variable(function, NULL, 1);
-        new_codeline->args[1] = find_random_variable(function, new_codeline->args[0]->data_type, 1); // Copy the argument type from the first argument
-        new_codeline->args[2] = NULL;
-        
-      }
-      else{
+      else
         // while statement
         new_codeline->type = CODELINE_TYPE_WHILE;
-        new_codeline->condition = fast_rand() % 6; // 6 possible conditions
-        new_codeline->args[0] = find_random_variable(function, NULL, 1);
-        new_codeline->args[1] = find_random_variable(function, new_codeline->args[0]->data_type, 1); // Copy the argument type from the first argument
-        new_codeline->args[2] = NULL;
-      }
     }
   }
   else {

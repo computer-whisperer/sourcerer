@@ -8,6 +8,13 @@ struct Membox_T * build_membox(size_t len) {
   membox->data_end = membox->data_start + len;
   membox->seed = 4819;
   
+  // Deterministically fuzz the memory region
+  char * ptr = membox->data_start;
+  while ((void *)ptr < membox->data_end) {
+    *ptr = 101;
+    ptr++;
+  }
+
   membox->first_freeblock = malloc(sizeof(struct MemboxFreeblock_T));
   membox->last_freeblock = membox->first_freeblock;
   membox->first_freeblock->data_start = membox->data_start;

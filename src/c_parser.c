@@ -913,6 +913,9 @@ void load_from_data(struct Environment_T * env, char * data) {
 		}
 		chain = chain->next;
 	}
+	// Free all chains
+	purge_children(root_chain);
+	free(root_chain);
 
 
 	/*

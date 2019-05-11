@@ -33,9 +33,9 @@ int executor_evaluate_condition(struct CodeLine_T * codeline) {
   return 0;
 }
 
-int validate_address(struct MemoryDMZ_T * dmz, void * ptr) {
+int validate_address(struct MemoryDMZ_T * dmz, void * ptr, char writing) {
   while (dmz) {
-    if (dmz->data_start <= ptr && ptr < dmz->data_end)
+    if (dmz->data_start <= ptr && ptr < dmz->data_end && (!writing || dmz->writable))
       return 1;
     dmz = dmz->next;
   }
@@ -119,7 +119,7 @@ int execute_function(struct Function_T * function, struct MemoryDMZ_T * dmz, voi
       
         src_ptr = codeline->args[0]->executor_top_varframe->data_start;
         for (int i = 0; i < codeline->arg0_reference_count; i++) {
-          if (!validate_address(dmz, src_ptr)) {
+          if (!validate_address(dmz, src_ptr, 0)) {
             returned = 1;
             break;
           }
@@ -137,16 +137,16 @@ int execute_function(struct Function_T * function, struct MemoryDMZ_T * dmz, voi
           // Copy actual bytes
           void * dest_ptr = codeline->assigned_variable->executor_top_varframe->data_start;
           for (int i = 0; i < codeline->assigned_variable_reference_count; i++) {
-            if (!validate_address(dmz, dest_ptr)) {
+            if (!validate_address(dmz, dest_ptr, 0)) {
               returned = 1;
               break;
             }
             dest_ptr = *(void **)dest_ptr;
           }
           
-          if (!validate_address(dmz, src_ptr))
+          if (!validate_address(dmz, src_ptr, 0))
             returned = 1;
-          if (!validate_address(dmz, dest_ptr))
+          if (!validate_address(dmz, dest_ptr, 1))
             returned = 1;
           
           if (returned) {
