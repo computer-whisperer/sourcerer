@@ -128,7 +128,7 @@ int task_judge_hello_world(struct TaskInputs_T * last_task_inputs, struct TaskOu
 
   int score = 0;
 
-  char * goal = "Hello world!";
+  char * goal = "I am the Sourcerer!!!";
 
   for (int i = 0; i < strlen(goal); i++) {
     if (last_task_outputs->putchar_text_len <= i) {

@@ -275,7 +275,7 @@ struct Change_T * propose_random_change(struct Function_T * function) {
       change->codeline = codeline;
     }
   }
-  else if (r < 80 || !codeline) {
+  else if (r < 50 || !codeline) {
     // Insert new line before the current line
     struct CodeLine_T * new_codeline = malloc(sizeof(struct CodeLine_T));
     new_codeline->assigned_variable = NULL;
@@ -304,12 +304,12 @@ struct Change_T * propose_random_change(struct Function_T * function) {
       else
         new_codeline->constant.i = fast_rand() % 10 - 5; // Any int from -5 to +5
     }
-    else if (0) {
+    else if (r < 30) {
       // return
       new_codeline->type = CODELINE_TYPE_RETURN;
       new_codeline->assigned_variable = find_random_variable(function, function->return_datatype, 1);
     }
-    else if (r < 60) {
+    else if (0) {
       // Pointer assignment
       new_codeline->type = CODELINE_TYPE_POINTER_ASSIGNMENT;
       

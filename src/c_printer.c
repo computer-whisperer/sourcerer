@@ -410,7 +410,7 @@ char * print_function_to_buffer(struct Function_T * function) {
 void print_function_limited(struct Function_T * function) {
   struct GeneratedLine_T * generated = generate_c(function);
   struct GeneratedLine_T * tofree;
-  char * text = concat_generated_lines(generated, 80);
+  char * text = concat_generated_lines(generated, 60);
   printf("%s", text);
   free(text);
   while (generated) {

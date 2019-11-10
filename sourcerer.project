@@ -21,30 +21,26 @@ indent_mode=2
 name=sourcerer
 base_path=/home/christian/Documents/workspace/sourcerer/
 description=
+file_patterns=
 
 [long line marker]
 long_line_behaviour=1
 long_line_column=72
 
 [files]
-current_page=16
-FILE_NAME_0=13110;C;0;EUTF-8;0;1;0;%2Fhome%2Fchristian%2FDocuments%2Fworkspace%2Fsourcerer%2Fsrc%2Fchange_proposer_0.c;0;2
-FILE_NAME_1=5715;C;0;EUTF-8;0;1;0;%2Fhome%2Fchristian%2FDocuments%2Fworkspace%2Fsourcerer%2Fsrc%2Fchanges.c;0;2
-FILE_NAME_2=0;CMake;0;EUTF-8;0;1;0;%2Fhome%2Fchristian%2FDocuments%2Fworkspace%2Fsourcerer%2Fsrc%2FCMakeLists.txt;0;2
-FILE_NAME_3=6317;C;0;EUTF-8;0;1;0;%2Fhome%2Fchristian%2FDocuments%2Fworkspace%2Fsourcerer%2Fsrc%2Fc_parser.c;0;2
-FILE_NAME_4=287;C++;0;EUTF-8;0;1;0;%2Fhome%2Fchristian%2FDocuments%2Fworkspace%2Fsourcerer%2Finclude%2Fc_parser.h;0;2
-FILE_NAME_5=445;C;0;EUTF-8;0;1;0;%2Fhome%2Fchristian%2FDocuments%2Fworkspace%2Fsourcerer%2Fsrc%2Fmain.c;0;2
-FILE_NAME_6=4063;C++;0;EUTF-8;0;1;0;%2Fhome%2Fchristian%2FDocuments%2Fworkspace%2Fsourcerer%2Finclude%2Fc_types.h;0;2
-FILE_NAME_7=264;C++;0;EUTF-8;0;1;0;%2Fhome%2Fchristian%2FDocuments%2Fworkspace%2Fsourcerer%2Finclude%2Fc_printer.h;0;2
-FILE_NAME_8=85;C++;0;EUTF-8;0;1;0;%2Fhome%2Fchristian%2FDocuments%2Fworkspace%2Fsourcerer%2Finclude%2Futils.h;0;2
-FILE_NAME_9=365;CMake;0;EUTF-8;0;1;0;%2Fhome%2Fchristian%2FDocuments%2Fworkspace%2Fsourcerer%2Ftests%2FCMakeLists.txt;0;2
-FILE_NAME_10=92;CMake;0;EUTF-8;0;1;0;%2Fhome%2Fchristian%2FDocuments%2Fworkspace%2Fsourcerer%2FCMakeLists.txt;0;2
-FILE_NAME_11=603;C;0;EUTF-8;0;1;0;%2Fhome%2Fchristian%2FDocuments%2Fworkspace%2Fsourcerer%2Ftests%2Fcheck_parser.c;0;2
-FILE_NAME_12=4778;C;0;EUTF-8;0;1;0;%2Fhome%2Fchristian%2FDocuments%2Fworkspace%2Fsourcerer%2Fsrc%2Fc_types.c;0;2
-FILE_NAME_13=193;C;0;EUTF-8;0;1;0;%2Fhome%2Fchristian%2FDocuments%2Fworkspace%2Fsourcerer%2Fsrc%2Fsearch.c;0;2
-FILE_NAME_14=3159;C;0;EUTF-8;0;1;0;%2Fhome%2Fchristian%2FDocuments%2Fworkspace%2Fsourcerer%2Fsrc%2Fc_printer.c;0;2
-FILE_NAME_15=0;C;0;EUTF-8;0;1;0;%2Fhome%2Fchristian%2FDocuments%2Fworkspace%2Fsourcerer%2Fexamples%2Fhello%20world%2Fhello_world_orig.c;0;2
-FILE_NAME_16=14767;Lua;0;EUTF-8;0;1;0;%2Fhome%2Fchristian%2F.factorio%2Fsaves%2Fbreakit8%2Fhotpatch%2Fmod-tools.lua;0;2
+current_page=2
+FILE_NAME_0=0;C;0;EUTF-8;0;1;0;%2Fhome%2Fchristian%2FDocuments%2Fworkspace%2Fc_testing_ground%2Futilities.c;0;2
+FILE_NAME_1=0;C++;0;EUTF-8;0;1;0;%2Fhome%2Fchristian%2FDocuments%2Fworkspace%2Fc_testing_ground%2Futilities.h;0;2
+FILE_NAME_2=2055;C;0;EUTF-8;0;1;0;%2Fhome%2Fchristian%2FDocuments%2Fworkspace%2Fc_testing_ground%2Fqueens.c;0;2
 
 [VTE]
-last_dir=/mnt/data/christian/Documents/workspace/playerofgames
+last_dir=/mnt/data/christian/Documents/workspace/bad_idea_generator
+
+[build-menu]
+CFT_00_LB=_Compile
+CFT_00_CM=gcc -Wall  "%f" -lm -g
+CFT_00_WD=
+CFT_01_LB=_Build
+CFT_01_CM=gcc -Wall -o "%e" "%f" -lm -O3
+CFT_01_WD=
+filetypes=C;

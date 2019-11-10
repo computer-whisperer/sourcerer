@@ -199,8 +199,83 @@ void academy_select_matchup_greedy(struct Academy_T * academy, struct Academy_Ag
 	return;
 }
 
+
+void academy_get_probability_field(struct Academy_Agent_T * agent, float * probabilities) {
+	// Score all candidates (first is parent)
+
+	probabilities[0] = agent->own_value + UCB_C*sqrt(ceil_log2(agent->times_queried) / (float)agent->own_games);
+	int i;
+	float sum = probabilities[0];
+	for (i = 0; i < agent->children_count; i++) {
+		if (agent->children[i].state == ACADEMY_AGENT_STATE_ALIVE) {
+			probabilities[i+1] = agent->children[i].value + UCB_C*sqrt(ceil_log2(agent->times_queried) / (float)agent->children[i].games_played);
+			sum += probabilities[i+1];
+		}
+		else {
+			probabilities[i+1] = 0.0;
+		}
+	}
+	// normalize
+	for (i = 0; i < agent->children_count+1; i++) {
+		probabilities[i] = probabilities[i]/sum;
+	}
+}
+
+void academy_update_expected_values(struct Academy_Agent_T * agent) {
+	float probabilities[agent->children_count + 1];
+	academy_get_probability_field(agent, probabilities);
+}
+
+
+void academy_select_matchup_probablistic(struct Academy_T * academy, struct Academy_Agent_T ** agent1, struct Academy_Agent_T ** agent2) {
+	struct Academy_Agent_T * current_agent = academy->root_agent;
+
+	int pass = 0;
+	int i;
+	while(current_agent) {
+		current_agent->times_queried++;
+
+		// Randomly check for prunable nodes to keep memory usage sane
+		if (fast_rand()%30 == 0)
+			tree_search_test_prune_from_node(current_agent);
+
+		float scores[current_agent->children_count + 1];
+		academy_get_probability_field(current_agent, scores);
+
+		// Select agent
+		float selector = ((float)fast_rand())/FAST_RAND_MAX;
+		int chosen_index;
+		for (chosen_index = 0; chosen_index < current_agent->children_count; chosen_index++) {
+			selector -= scores[chosen_index];
+			if (selector <= 0)
+				break;
+		}
+
+		// I select ME!
+		if (chosen_index == 0) {
+			current_agent->own_games++;
+			if (pass == 0) {
+				*agent1 = current_agent;
+				pass = 1;
+				current_agent = academy->root_agent;
+			}
+			else {
+				*agent2 = current_agent;
+				return;
+			}
+		}
+		else {
+			current_agent->children[chosen_index-1].games_played++;
+			current_agent = current_agent->children[chosen_index-1].agent;
+		}
+	}
+	return;
+}
+
+
+
 void academy_select_matchup(struct Academy_T * academy, struct Academy_Agent_T ** agent1, struct Academy_Agent_T ** agent2) {
-	academy_select_matchup_greedy(academy, agent1, agent2);
+	academy_select_matchup_probablistic(academy, agent1, agent2);
 }
 
 

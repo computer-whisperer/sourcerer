@@ -197,10 +197,12 @@ void run_agent_agent_games() {
 		struct Academy_Agent_T * node1;
 		struct Academy_Agent_T * node2;
 		// Alternate player numbers
-		if (games_played %2)
-			academy_select_matchup(academy, &node1, &node2);
-		else
-			academy_select_matchup(academy, &node2, &node1);
+		while (node1 == node2) {
+			if (games_played %2)
+				academy_select_matchup(academy, &node1, &node2);
+			else
+				academy_select_matchup(academy, &node2, &node1);
+		}
 
 		iter_1 = 0;
 		load_from_data(env1, node1->c_code);

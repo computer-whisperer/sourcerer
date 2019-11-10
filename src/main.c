@@ -11,7 +11,7 @@
 
 int main(int argc, char * argv[]){
   // Seed random num
-  fast_srand(time(NULL));
+  //fast_srand(time(NULL));
   // Set locale for big number commas
   setlocale(LC_NUMERIC, "");
 
@@ -23,8 +23,8 @@ int main(int argc, char * argv[]){
   
   //judge = task_judge_count;
   //judge = task_judge_flip_number;
-  //judge = task_judge_hello_world;
-  judge = task_judge_calculator;
+  judge = task_judge_hello_world;
+  //judge = task_judge_calculator;
   //judge = task_judge_expfit;
   
   

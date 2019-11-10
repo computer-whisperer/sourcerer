@@ -58,7 +58,7 @@ int get_fitness(struct Function_T * function, TaskJudge_T task_judge) {
 int best_score;
 void report_progress(struct Function_T * function, TaskJudge_T task_judge, int current_cycle,  int current_iteration, int total_iterations) {
   int current_score = get_fitness(function, task_judge);
-  printf("\e[1;1H\e[2J\n\n"); // Clear screen
+  printf("\033c"); // Clear screen
   if (current_cycle >= 0)
     printf("Cycle: #%i \n" , current_cycle);
   putchar_buff[putchar_i] = '\0';
@@ -113,7 +113,7 @@ void simulated_annealing_search(struct Function_T * function, TaskJudge_T task_j
 
         free_change(change);
       }
-      if (!(i % 100) && getUnixTime()-last_update > 0.5) {
+      if (!(i % 100) && (getUnixTime()-last_update > 0.5)) {
         last_update += 0.5;
         report_progress(function, task_judge, batch_num, i, max_iterations);
       }
